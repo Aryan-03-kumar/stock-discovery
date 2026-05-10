@@ -1,0 +1,161 @@
+# stock-discovery
+
+A Claude Code plugin for **fundamental research and discovery** on Indian stocks (NSE/BSE). Translates a sector thesis into companies, runs anomaly scans on 10-12 years of financials, supports cross-stock Q&A mid-flow, and learns from your accept/reject reasons over time.
+
+It is **not** a stock picker, **not** a screener, and **not** a technical-analysis tool. You stay in the driver's seat — the plugin brings the inputs.
+
+> **See [docs/walkthrough.pdf](docs/walkthrough.pdf)** for an end-to-end walkthrough — turn-by-turn transcript of what the experience actually feels like, with real Screener data.
+
+---
+
+## How it fits together
+
+```
+                    ┌─────────────────────┐
+You pick a sector →│ thesis-to-products  │ → list of investable sub-themes
+                    └─────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────────┐
+   You pick a    →│   find-companies    │ → 6-12 NSE/BSE tickers
+   sub-theme       └─────────────────────┘     (saved to state/shortlist.md)
+                              │
+                              ▼
+                    ┌─────────────────────┐
+                  →│   anomaly-scan      │ → BS/P&L/CF anomalies per ticker
+                    └─────────────────────┘     (10-12 yrs, Screener-sourced)
+                              │
+                              ├──→ ┌──────────┐  Ad-hoc cross-stock questions
+                              │    │ compare  │  ("D/E across these 10?")
+                              │    └──────────┘  Callable any time, mid-flow.
+                              ▼
+                    ┌─────────────────────┐
+   You accept/    →│      decide         │ → audit-trail in decisions/
+   reject + reason  └─────────────────────┘     (cross-questions thin reasons)
+                              │
+                              ▼
+                    ┌─────────────────────┐
+                    │ philosophy-refresh  │ → updates memory/philosophy.md
+                    └─────────────────────┘     (loaded into every future run)
+```
+
+---
+
+## Install
+
+You'll need **Claude Code** and **Python 3.10+**.
+
+```bash
+# 1. Clone
+git clone <this-repo> stock-discovery
+cd stock-discovery
+
+# 2. Python deps for the data tools
+python -m venv .venv
+source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# 3. Tell Claude Code about the plugin
+# Option A — symlink into your plugins dir:
+ln -s "$(pwd)" ~/.claude/plugins/stock-discovery
+
+# Option B — install via Claude Code CLI:
+claude plugin install $(pwd)
+```
+
+Restart Claude Code. The 6 skills should now auto-trigger when you describe what you want, or you can invoke them by name.
+
+---
+
+## Worked example (10 minutes end-to-end)
+
+In Claude Code, in this directory:
+
+**1. Translate a thesis to sub-themes**
+
+> "Use thesis-to-products. Sector: Indian defence manufacturing. Thesis: indigenisation tailwind from MoD orders. Horizon: 3-5 years."
+
+You'll get a table of sub-themes — drones / loitering munitions, artillery systems, avionics, shipbuilding sub-systems, optronics, etc.
+
+**2. Get tickers for one sub-theme**
+
+> "Use find-companies on loitering munitions / drones. Show primary, auxiliary, and adjacent."
+
+You'll get 6-12 NSE tickers split across the three buckets, all appended to `state/shortlist.md` as `candidate`.
+
+**3. Scan all of them**
+
+> "Run anomaly-scan on all candidates."
+
+For each ticker: 10-12 years of P&L / BS / CF pulled from Screener.in, anomalies flagged with severity. Statuses flip to `scanned` in the shortlist. Data caches to `.cache/<TICKER>.json` for 7 days.
+
+**4. Ask a cross-stock question, mid-flow**
+
+> "Use compare. What's the debt-to-equity and 5-yr revenue CAGR across these companies?"
+
+Returns a markdown table with both metrics + a paragraph naming the outliers. Reuses the cached data — no re-fetching.
+
+**5. Decide on each one**
+
+> "Use decide. Reject PARAS.NS — receivables grew 3.5× in 4 years while revenue grew 1.6×, signals collection issues."
+
+The `decide` skill saves the verdict to `decisions/PARAS.NS/<date>.md`, updates the shortlist, and runs `philosophy-refresh`.
+
+If you give a thin reason ("looks weak"), it'll cross-question you before saving — exactly the management-vs-demand pattern you described.
+
+**6. Compound**
+
+After 5-10 decisions, `memory/philosophy.md` will contain a distilled prescriptive summary of your investment style. Every subsequent run of `find-companies`, `anomaly-scan`, and `compare` loads it as context, so suggestions and flags get sharper over time.
+
+---
+
+## File map
+
+```
+.claude-plugin/plugin.json    # plugin manifest
+skills/                       # six SKILL.md files, one per capability
+tools/                        # python: data fetchers + state helpers
+  fetch_screener.py             # screener.in scraper, 7-day cache
+  fetch_yfinance.py             # ticker validation fallback
+  lib/normalize.py              # canonical JSON shape
+  lib/shortlist.py              # state/shortlist.md read/write
+state/shortlist.md            # current working set (hand-editable)
+decisions/<TICKER>/<date>.md  # audit trail of accept/reject reasons
+memory/criteria.md            # your anomaly checklist (edit freely)
+memory/philosophy.md          # auto-distilled from decisions
+.cache/                       # gitignored fetch cache
+```
+
+---
+
+## Editing the criteria
+
+`memory/criteria.md` is the anomaly checklist. Anomaly-scan reads it on every run. If you find yourself constantly overriding the same defaults, just edit the file — every skill picks it up immediately.
+
+---
+
+## What's not in v0
+
+- No web app / UI. Chat is the interface.
+- No technical analysis (you do that yourself, after this).
+- No live prices, portfolio tracking, or P&L.
+- No multi-user. This is a personal research repo.
+- No 25-year history yet — Screener gives ~10-12 years free, which is enough to get started. If you need deeper, swap `fetch_screener.py` for a paid source (FMP, TIKR, Screener Pro) — the rest of the system doesn't change.
+
+---
+
+## Troubleshooting
+
+**Screener returns 404 for a ticker** — it may only have a standalone (not consolidated) page. The fetcher retries automatically; if both fail, the ticker may be delisted or wrong.
+
+**`yfinance` import error** — make sure you `pip install -r requirements.txt` inside the venv before running Claude Code.
+
+**Skills not triggering** — restart Claude Code after `claude plugin install`. Check the skill is listed in the system prompt's available-skills section.
+
+**Decisions piling up but philosophy.md looks stale** — call the `philosophy-refresh` skill manually. The `decide` skill triggers it after each save, but if you hand-edit decisions, you need to refresh yourself.
+
+---
+
+## License
+
+MIT — do whatever, just don't blame the plugin for your trades.
