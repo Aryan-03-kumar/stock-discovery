@@ -11,6 +11,7 @@ export interface ShortlistEntry {
 export interface DecisionEntry {
   ticker: string;
   verdict: "accept" | "reject";
+  sector: string;
   date: string;
   reason: string;
   anomalies: string[];
@@ -19,10 +20,15 @@ export interface DecisionEntry {
   status_before: Status | "unknown";
 }
 
+export interface Philosophy {
+  universal: string;
+  sectors: Record<string, string>;
+}
+
 export interface State {
   shortlist: ShortlistEntry[];
   decisions: DecisionEntry[];
-  philosophy: string;
+  philosophy: Philosophy;
   criteria: string;
 }
 

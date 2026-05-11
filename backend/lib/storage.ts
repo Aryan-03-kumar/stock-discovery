@@ -1,8 +1,8 @@
 import { put, head } from "@vercel/blob";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { defaultState } from "./defaults";
-import type { State, FinancialsCache } from "./types";
+import { DEFAULT_UNIVERSAL_PHILOSOPHY, defaultState } from "./defaults";
+import type { State, FinancialsCache, Philosophy, DecisionEntry } from "./types";
 
 const USE_BLOB = !!process.env.BLOB_READ_WRITE_TOKEN;
 const LOCAL_DIR = path.join(process.cwd(), ".data");
@@ -41,12 +41,50 @@ async function writeBlobAt(pathname: string, content: string): Promise<void> {
   await fs.writeFile(fp, content, "utf-8");
 }
 
+function upgradePhilosophy(value: unknown): Philosophy {
+  if (typeof value === "string") {
+    return { universal: value || DEFAULT_UNIVERSAL_PHILOSOPHY, sectors: {} };
+  }
+  if (value && typeof value === "object") {
+    const v = value as Partial<Philosophy>;
+    return {
+      universal: typeof v.universal === "string" ? v.universal : DEFAULT_UNIVERSAL_PHILOSOPHY,
+      sectors:
+        v.sectors && typeof v.sectors === "object" && !Array.isArray(v.sectors)
+          ? (v.sectors as Record<string, string>)
+          : {},
+    };
+  }
+  return { universal: DEFAULT_UNIVERSAL_PHILOSOPHY, sectors: {} };
+}
+
+function upgradeDecisions(value: unknown): DecisionEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((d) => ({
+    ticker: String(d?.ticker ?? "UNKNOWN"),
+    verdict: d?.verdict === "accept" ? "accept" : "reject",
+    sector: typeof d?.sector === "string" && d.sector.length > 0 ? d.sector : "unspecified",
+    date: typeof d?.date === "string" ? d.date : new Date().toISOString().slice(0, 10),
+    reason: typeof d?.reason === "string" ? d.reason : "",
+    anomalies: Array.isArray(d?.anomalies) ? d.anomalies : [],
+    cross_questioning: typeof d?.cross_questioning === "string" ? d.cross_questioning : "",
+    open_follow_ups: typeof d?.open_follow_ups === "string" ? d.open_follow_ups : "",
+    status_before: d?.status_before ?? "unknown",
+  }));
+}
+
 export async function readState(userId: string): Promise<State> {
   const raw = await readBlobAt(`users/${userId}/state.json`);
   if (!raw) return defaultState();
   try {
     const parsed = JSON.parse(raw);
-    return { ...defaultState(), ...parsed };
+    const base = defaultState();
+    return {
+      shortlist: Array.isArray(parsed?.shortlist) ? parsed.shortlist : base.shortlist,
+      decisions: upgradeDecisions(parsed?.decisions),
+      philosophy: upgradePhilosophy(parsed?.philosophy),
+      criteria: typeof parsed?.criteria === "string" ? parsed.criteria : base.criteria,
+    };
   } catch {
     return defaultState();
   }

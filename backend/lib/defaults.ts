@@ -1,4 +1,4 @@
-import type { State } from "./types";
+import type { Philosophy, State } from "./types";
 
 export const DEFAULT_CRITERIA = `# Anomaly criteria
 
@@ -42,10 +42,34 @@ Default checklist used by the anomaly-scan and compare flows. Edit freely.
 - Sector-wide cyclical downturns.
 `;
 
-export const DEFAULT_PHILOSOPHY = `# Investment Philosophy
+export const DEFAULT_UNIVERSAL_PHILOSOPHY = `# Investment Philosophy — Universal
 
-> This file is rewritten by the refresh-philosophy flow after each accept/reject decision.
-> It will look empty until the first few decisions accumulate.
+> Lenses that apply across every Indian-market sector you research. Rewritten by the philosophy-refresh flow when a lens shows up in decisions from 2+ different sectors.
+>
+> Empty until enough cross-sector decisions accumulate.
+
+## Disqualifiers
+_(none yet)_
+
+## Strong negatives
+_(none yet)_
+
+## Strong positives
+_(none yet)_
+
+## Treated as noise
+_(none yet)_
+
+## Subjectivity dimensions
+_(none yet)_
+`;
+
+export function defaultSectorPhilosophy(sector: string): string {
+  return `# Investment Philosophy — ${sector}
+
+> Lenses specific to **${sector}**. Rewritten by the philosophy-refresh flow as you save decisions in this sector.
+>
+> Once a lens here appears in another sector too, it gets promoted to the universal philosophy and removed from here.
 
 ## Disqualifiers
 _(none yet)_
@@ -65,12 +89,18 @@ _(none yet)_
 ## Recent verdicts at a glance
 _(none yet)_
 `;
+}
+
+export const DEFAULT_PHILOSOPHY: Philosophy = {
+  universal: DEFAULT_UNIVERSAL_PHILOSOPHY,
+  sectors: {},
+};
 
 export function defaultState(): State {
   return {
     shortlist: [],
     decisions: [],
-    philosophy: DEFAULT_PHILOSOPHY,
+    philosophy: { ...DEFAULT_PHILOSOPHY, sectors: {} },
     criteria: DEFAULT_CRITERIA,
   };
 }

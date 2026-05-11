@@ -5,9 +5,12 @@ import { readState, writeState } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
+const SECTOR_RX = /^[a-z][a-z0-9-]{0,40}$/;
+
 const SaveSchema = z.object({
   ticker: z.string().min(1).max(32),
   verdict: z.enum(["accept", "reject"]),
+  sector: z.string().regex(SECTOR_RX),
   reason: z.string().min(20),
   anomalies: z.array(z.string()).default([]),
   cross_questioning: z.string().default(""),
@@ -17,11 +20,15 @@ const SaveSchema = z.object({
 export async function GET(req: NextRequest) {
   const userId = getUserId(req);
   if (!userId) return unauthorized();
+
   const state = await readState(userId);
   const ticker = req.nextUrl.searchParams.get("ticker");
-  const list = ticker
-    ? state.decisions.filter((d) => d.ticker === ticker.toUpperCase())
-    : state.decisions;
+  const sector = req.nextUrl.searchParams.get("sector");
+
+  let list = state.decisions;
+  if (ticker) list = list.filter((d) => d.ticker === ticker.toUpperCase());
+  if (sector) list = list.filter((d) => d.sector === sector);
+
   return NextResponse.json({ decisions: list });
 }
 
@@ -40,6 +47,7 @@ export async function POST(req: NextRequest) {
   state.decisions.push({
     ticker,
     verdict: parsed.data.verdict,
+    sector: parsed.data.sector,
     date: new Date().toISOString().slice(0, 10),
     reason: parsed.data.reason,
     anomalies: parsed.data.anomalies,
@@ -51,11 +59,13 @@ export async function POST(req: NextRequest) {
   if (row) {
     row.status = parsed.data.verdict === "accept" ? "accepted" : "rejected";
     row.last_touched = new Date().toISOString().slice(0, 10);
-    if (!row.note) {
-      row.note = parsed.data.reason.slice(0, 80);
-    }
+    if (!row.note) row.note = parsed.data.reason.slice(0, 80);
   }
 
   await writeState(userId, state);
-  return NextResponse.json({ ok: true, decisions_count: state.decisions.length });
+  return NextResponse.json({
+    ok: true,
+    decisions_count: state.decisions.length,
+    sector: parsed.data.sector,
+  });
 }

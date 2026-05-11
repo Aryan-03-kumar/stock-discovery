@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "sync-skill-template": "node scripts/sync-skill-template.mjs",
+    "predev": "npm run sync-skill-template",
+    "prebuild": "npm run sync-skill-template",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -11,6 +14,7 @@
   "dependencies": {
     "@vercel/blob": "^2.3.3",
     "cheerio": "^1.2.0",
+    "jszip": "^3.10.1",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
