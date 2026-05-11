@@ -1,8 +1,8 @@
-import { put, head } from "@vercel/blob";
+import { put, head, list } from "@vercel/blob";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_UNIVERSAL_PHILOSOPHY, defaultState } from "./defaults";
-import type { State, FinancialsCache, Philosophy, DecisionEntry } from "./types";
+import type { State, FinancialsCache, Philosophy, DecisionEntry, LogEntry } from "./types";
 
 const USE_BLOB = !!process.env.BLOB_READ_WRITE_TOKEN;
 const LOCAL_DIR = path.join(process.cwd(), ".data");
@@ -108,4 +108,81 @@ export const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export function isFresh(fetchedAt: string): boolean {
   const age = Date.now() - new Date(fetchedAt).getTime();
   return age < CACHE_TTL_MS;
+}
+
+// === Logs ===
+// One JSONL file per user per UTC day: users/<userId>/logs/<YYYY-MM-DD>.jsonl.
+// Append is read-modify-write — fine for our scale (a few events/day per user).
+
+function todayUTC(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function logPath(userId: string, date: string): string {
+  return `users/${userId}/logs/${date}.jsonl`;
+}
+
+export async function appendLogEntries(
+  userId: string,
+  entries: LogEntry[],
+): Promise<{ date: string; count: number }> {
+  if (entries.length === 0) return { date: todayUTC(), count: 0 };
+  const date = todayUTC();
+  const pathname = logPath(userId, date);
+  const existing = (await readBlobAt(pathname)) ?? "";
+  const newLines = entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
+  await writeBlobAt(pathname, existing + newLines);
+  return { date, count: entries.length };
+}
+
+export async function readLogDay(userId: string, date: string): Promise<LogEntry[]> {
+  const raw = await readBlobAt(logPath(userId, date));
+  if (!raw) return [];
+  const lines = raw.split("\n").filter((l) => l.trim().length > 0);
+  const out: LogEntry[] = [];
+  for (const line of lines) {
+    try {
+      out.push(JSON.parse(line) as LogEntry);
+    } catch {
+      // skip malformed lines
+    }
+  }
+  return out;
+}
+
+export async function listLogDates(userId: string): Promise<string[]> {
+  const prefix = `users/${userId}/logs/`;
+  if (USE_BLOB) {
+    const out: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await list({ prefix, cursor, limit: 1000 });
+      for (const blob of page.blobs) {
+        const name = blob.pathname.slice(prefix.length);
+        if (name.endsWith(".jsonl")) out.push(name.slice(0, -".jsonl".length));
+      }
+      cursor = page.hasMore ? page.cursor : undefined;
+    } while (cursor);
+    return out.sort().reverse();
+  }
+  try {
+    const dir = path.join(LOCAL_DIR, prefix);
+    const entries = await fs.readdir(dir);
+    return entries
+      .filter((n) => n.endsWith(".jsonl"))
+      .map((n) => n.slice(0, -".jsonl".length))
+      .sort()
+      .reverse();
+  } catch {
+    return [];
+  }
+}
+
+export async function readLogsSince(userId: string, sinceDate: string): Promise<LogEntry[]> {
+  const dates = (await listLogDates(userId)).filter((d) => d >= sinceDate).sort();
+  const out: LogEntry[] = [];
+  for (const date of dates) {
+    out.push(...(await readLogDay(userId, date)));
+  }
+  return out;
 }

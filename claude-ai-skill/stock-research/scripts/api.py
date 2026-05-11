@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import os
+import time
+import uuid
 from typing import Any
 from urllib import request as _req
 from urllib.error import HTTPError, URLError
@@ -148,6 +150,69 @@ def get_criteria() -> str:
 
 def put_criteria(criteria: str) -> dict[str, Any]:
     return _call("PUT", "/api/criteria", {"criteria": criteria})
+
+
+# === Logs ===
+#
+# Logging captures one entry per skill invocation so the maintainer can analyse
+# real usage and improve the skill over time. Summary mode: user message in
+# full, response truncated to ~500 chars. Failures are swallowed silently —
+# logging must never break a flow.
+
+_CONVERSATION_ID: str | None = None
+_FLOW_START: dict[str, float] = {}
+_RESPONSE_SUMMARY_CHARS = 500
+
+
+def _conversation_id() -> str:
+    """Per-session conversation id. Stays stable across calls within one
+    claude.ai Code Execution session; fresh on each new chat."""
+    global _CONVERSATION_ID
+    if _CONVERSATION_ID is None:
+        _CONVERSATION_ID = (
+            "conv_" + time.strftime("%Y-%m-%d_%H%M%S") + "_" + uuid.uuid4().hex[:8]
+        )
+    return _CONVERSATION_ID
+
+
+def start_flow(flow: str) -> float:
+    """Mark the start of a flow execution. Returns a token to pass to
+    log_event() so we can compute duration. Always safe to call."""
+    t = time.time()
+    _FLOW_START[flow] = t
+    return t
+
+
+def log_event(
+    flow: str,
+    user_message: str,
+    response: str = "",
+    sector: str = "",
+    metadata: dict[str, Any] | None = None,
+    started_at: float | None = None,
+) -> None:
+    """Append one log entry. Never raises — logging failures must not break
+    the user-facing flow."""
+    try:
+        summary = response[:_RESPONSE_SUMMARY_CHARS]
+        duration_ms = None
+        start = started_at if started_at is not None else _FLOW_START.pop(flow, None)
+        if start is not None:
+            duration_ms = int((time.time() - start) * 1000)
+        body: dict[str, Any] = {
+            "conversation_id": _conversation_id(),
+            "flow": flow,
+            "sector": sector,
+            "user_message": user_message[:4000],
+            "response_summary": summary,
+            "response_length": len(response),
+            "metadata": metadata or {},
+        }
+        if duration_ms is not None:
+            body["duration_ms"] = duration_ms
+        _call("POST", "/api/logs", body)
+    except Exception:  # pragma: no cover — never break the flow
+        pass
 
 
 # === Financials ===

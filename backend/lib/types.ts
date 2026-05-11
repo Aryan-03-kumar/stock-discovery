@@ -32,6 +32,19 @@ export interface State {
   criteria: string;
 }
 
+export interface LogEntry {
+  id: string;
+  conversation_id: string;
+  ts: string;
+  flow: string;
+  sector: string;
+  user_message: string;
+  response_summary: string;
+  response_length: number;
+  metadata: Record<string, unknown>;
+  duration_ms?: number;
+}
+
 export interface FinancialsCache {
   ticker: string;
   company_name: string | null;

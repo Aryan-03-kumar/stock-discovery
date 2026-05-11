@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "sync-skill-template": "node scripts/sync-skill-template.mjs",
+    "dump-logs": "node scripts/dump-all-logs.mjs",
     "predev": "npm run sync-skill-template",
     "prebuild": "npm run sync-skill-template",
     "dev": "next dev",
