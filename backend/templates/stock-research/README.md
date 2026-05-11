@@ -62,6 +62,22 @@ When you research a new theme, the skill loads `universal + <that sector>` — n
 
 ## Privacy
 
-Your state (shortlist, decisions, philosophy) is stored under a token that only you have. Nobody else can read it — not Aryan, not anyone with the source code. The backend is open source: [github.com/Aryan-03-kumar/stock-discovery](https://github.com/Aryan-03-kumar/stock-discovery).
+Your state (shortlist, decisions, philosophy) is stored under a token that only you have. Other users with their own tokens cannot read or write your namespace. The backend is open source: [github.com/Aryan-03-kumar/stock-discovery](https://github.com/Aryan-03-kumar/stock-discovery).
 
 **Lose the token = lose the state.** There's no recovery, no email, no password. Treat it like a wallet seed phrase.
+
+**One thing to know upfront — conversations are logged.** Every skill invocation writes a log entry under your namespace: the literal user message, the first 500 characters of the skill's response, the sector, flow, and duration. These logs help the maintainer (Aryan) improve the skill over time by identifying where it stumbles.
+
+You can read your own logs anytime:
+
+```bash
+curl -H "Authorization: Bearer <YOUR_TOKEN>" \
+  https://stock-discovery.vercel.app/api/logs
+curl -H "Authorization: Bearer <YOUR_TOKEN>" \
+  "https://stock-discovery.vercel.app/api/logs?date=2026-05-11"
+curl -H "Authorization: Bearer <YOUR_TOKEN>" \
+  "https://stock-discovery.vercel.app/api/logs/export?since=2026-05-01" \
+  > my-logs.jsonl
+```
+
+The maintainer can read all users' logs because they own the Vercel project that hosts the backend — there's no separate admin endpoint exposed on the public internet. If you'd rather not be logged at all, self-host the backend (the source is MIT) and point your skill at your own URL.

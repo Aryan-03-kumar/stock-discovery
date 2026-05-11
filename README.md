@@ -17,12 +17,16 @@ The two surfaces share the same 6-skill design and Screener data pipeline — th
 
 ### For claude.ai users
 
-1. Sign in to claude.ai (free or Pro).
-2. Settings → Capabilities → Skills → Upload — point at `claude-ai-skill/stock-research/`.
-3. Personalize `scripts/api.py` with the user token Aryan gives you.
-4. Open a chat. Start typing your sector thesis.
+1. Visit **https://stock-discovery.vercel.app** and click **Generate my skill**.
+2. Save the token shown — it's your only access. Lose it, lose your state.
+3. Download the personalized skill zip.
+4. In claude.ai → Settings → Capabilities → Skills → Upload, drop the zip.
+5. Make sure **Code Execution** is enabled.
+6. Open a chat. Start typing your sector thesis.
 
 The backend lives at https://stock-discovery.vercel.app and stores per-user state in Vercel Blob. Nothing exposed without your bearer token.
+
+**One thing to know upfront:** conversations are logged. Every skill invocation writes a JSONL entry under your namespace — full user message, first 500 chars of the skill's response, sector, flow, duration. Logs help the maintainer (Aryan) improve the skill. You can read your own logs at `GET /api/logs?date=YYYY-MM-DD` or export everything via `GET /api/logs/export?since=...`. See [docs/logging.md](#logging) below.
 
 ### For Claude Code users
 
@@ -163,6 +167,49 @@ memory/philosophy.md          # auto-distilled from decisions
 - No live prices, portfolio tracking, or P&L.
 - No multi-user. This is a personal research repo.
 - No 25-year history yet — Screener gives ~10-12 years free, which is enough to get started. If you need deeper, swap `fetch_screener.py` for a paid source (FMP, TIKR, Screener Pro) — the rest of the system doesn't change.
+
+---
+
+## Logging
+
+Every skill invocation against the hosted backend writes one log entry. The maintainer uses these to improve the skill over time. Stored per user at `users/<token>/logs/<YYYY-MM-DD>.jsonl` in Vercel Blob.
+
+**Entry shape** (summary mode — full user message, first 500 chars of response, plus metadata):
+
+```jsonc
+{
+  "id": "uuid",
+  "conversation_id": "conv_2026-05-11_abc",
+  "ts": "2026-05-11T14:32:18Z",
+  "flow": "find-companies",
+  "sector": "rolling-stock",
+  "user_message": "Find me companies for VB sleeper coaches",
+  "response_summary": "Primary: TITAGARH.NS, JWL.NS, ...",
+  "response_length": 4800,
+  "metadata": { "tickers_added": 8 },
+  "duration_ms": 4200
+}
+```
+
+**Reading your own logs** (claude.ai users — substitute your token):
+
+```bash
+curl -H "Authorization: Bearer <YOUR_TOKEN>" https://stock-discovery.vercel.app/api/logs
+curl -H "Authorization: Bearer <YOUR_TOKEN>" "https://stock-discovery.vercel.app/api/logs?date=2026-05-11"
+curl -H "Authorization: Bearer <YOUR_TOKEN>" "https://stock-discovery.vercel.app/api/logs/export?since=2026-05-01" > logs.jsonl
+```
+
+**Owner-side bulk export** (maintainer only — requires `BLOB_READ_WRITE_TOKEN`):
+
+```bash
+cd backend
+npx vercel env pull                  # populates .env.local
+npm run dump-logs                    # writes dist/logs/<userId>/<date>.jsonl
+```
+
+No admin endpoint is exposed on the public internet. The maintainer can read all users' logs because they own the Vercel project; outside attackers cannot pivot from a leaked user token to other users' data.
+
+**Quota:** ~1-2 KB per entry. Heavy use of 50 flows/day = ~36 MB/year per user. Free tier supports decades.
 
 ---
 
