@@ -5,3 +5,6 @@ __pycache__/
 venv/
 .DS_Store
 .env
+
+# Per-user skill bundles with embedded tokens (never commit)
+dist/

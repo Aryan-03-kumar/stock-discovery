@@ -1,10 +1,32 @@
 # stock-discovery
 
-A Claude Code plugin for **fundamental research and discovery** on Indian stocks (NSE/BSE). Translates a sector thesis into companies, runs anomaly scans on 10-12 years of financials, supports cross-stock Q&A mid-flow, and learns from your accept/reject reasons over time.
+A research copilot for **fundamental discovery on Indian stocks (NSE/BSE)**. Translates a sector thesis into companies, runs anomaly scans on 10-12 years of financials, supports cross-stock Q&A mid-flow, and learns from your accept/reject reasons over time.
 
-It is **not** a stock picker, **not** a screener, and **not** a technical-analysis tool. You stay in the driver's seat — the plugin brings the inputs.
+It is **not** a stock picker, **not** a screener, and **not** a technical-analysis tool. You stay in the driver's seat — the system brings the inputs.
 
-> **See [docs/walkthrough.pdf](docs/walkthrough.pdf)** for an end-to-end walkthrough — turn-by-turn transcript of what the experience actually feels like, with real Screener data.
+> **See [docs/walkthrough.pdf](docs/walkthrough.pdf)** for an end-to-end walkthrough with real Screener data — turn-by-turn transcript of what the experience actually feels like.
+
+## Two ways to use it
+
+| | Where it runs | Setup | Persistence |
+|---|---|---|---|
+| **Claude.ai chat (recommended for non-technical users)** | claude.ai web/mobile | Upload [claude-ai-skill/stock-research](claude-ai-skill/stock-research) once | Hosted backend ([backend/](backend/)) on Vercel, automatic |
+| **Claude Code plugin** | Local terminal | Clone repo, `pip install`, symlink into `~/.claude/plugins/` | Local markdown files in this repo |
+
+The two surfaces share the same 6-skill design and Screener data pipeline — they just differ in where state lives.
+
+### For claude.ai users
+
+1. Sign in to claude.ai (free or Pro).
+2. Settings → Capabilities → Skills → Upload — point at `claude-ai-skill/stock-research/`.
+3. Personalize `scripts/api.py` with the user token Aryan gives you.
+4. Open a chat. Start typing your sector thesis.
+
+The backend lives at https://stock-discovery.vercel.app and stores per-user state in Vercel Blob. Nothing exposed without your bearer token.
+
+### For Claude Code users
+
+See **Install** below.
 
 ---
 
