@@ -1,6 +1,0 @@
-{
-  "name": "stock-discovery",
-  "version": "0.1.0",
-  "description": "Fundamental research copilot for NSE/BSE stock discovery. Translates thesis to companies, runs anomaly scans on 10-12yr financials, supports cross-stock Q&A, and learns from accept/reject reasons.",
-  "author": "Aryan Kumar"
-}
